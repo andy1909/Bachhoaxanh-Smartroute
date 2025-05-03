@@ -255,6 +255,25 @@
             line-height: 22px !important;
             font-size: 16px !important;
         }
+        #logoutDropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px;
+            z-index: 1001;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #logoutDropdown.active {
+            display: block;
+        }
+        #logoutButton {
+            padding: 2px 8px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -270,9 +289,11 @@
         </div>
         <div class="nav-links">
             <button id="routingButton"><i class="fas fa-route"></i> Routing</button>
-            <div id="userSection">
+            <div id="userSection" class="relative">
                 <a href="login.html" id="loginLink"><i class="fas fa-user"></i> <span id="loginText">Đăng Nhập</span></a>
-                <button id="logoutButton" class="ml-2 bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 hidden">Đăng Xuất</button>
+                <div id="logoutDropdown" class="absolute">
+                    <button id="logoutButton" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">Đăng Xuất</button>
+                </div>
             </div>
         </div>
     </header>
@@ -476,45 +497,55 @@
             const startSuggestions = document.getElementById('startLocationSuggestions');
             const startArrow = document.getElementById('startDropdownArrow');
 
-            startInput.addEventListener('input', () => {
-                const query = normalizeVietnameseText(startInput.value);
+            function updateSuggestions(query = '') {
                 startSuggestions.innerHTML = '';
-                if (query.length < 1) {
-                    startSuggestions.classList.remove('active');
-                    startInput.dataset.index = '';
-                    updateMarkers();
-                    return;
-                }
-
-                const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
-                if (suggestions.length > 0) {
-                    suggestions.forEach((store, idx) => {
-                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                        const div = document.createElement('div');
-                        div.className = 'location-suggestion';
-                        div.textContent = store.name;
-                        div.dataset.index = storeIdx;
-                        div.addEventListener('click', () => {
-                            startInput.value = store.name;
-                            startInput.dataset.index = storeIdx;
-                            startSuggestions.classList.remove('active');
-                            startArrow.classList.remove('fa-chevron-up');
-                            startArrow.classList.add('fa-chevron-down');
-                            updateMarkers();
-                        });
-                        startSuggestions.appendChild(div);
-                    });
+                if (query.length < 1 || stores.length === 0) {
+                    const noData = document.createElement('div');
+                    noData.className = 'location-suggestion';
+                    noData.textContent = 'Không tìm thấy dữ liệu';
+                    noData.style.cursor = 'default';
+                    startSuggestions.appendChild(noData);
                     startSuggestions.classList.add('active');
                 } else {
-                    startInput.dataset.index = '';
-                    updateMarkers();
+                    const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                    if (suggestions.length > 0) {
+                        suggestions.forEach((store, idx) => {
+                            const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                            const div = document.createElement('div');
+                            div.className = 'location-suggestion';
+                            div.textContent = store.name;
+                            div.dataset.index = storeIdx;
+                            div.addEventListener('click', () => {
+                                startInput.value = store.name;
+                                startInput.dataset.index = storeIdx;
+                                startSuggestions.classList.remove('active');
+                                startArrow.classList.remove('fa-chevron-up');
+                                startArrow.classList.add('fa-chevron-down');
+                                updateMarkers();
+                            });
+                            startSuggestions.appendChild(div);
+                        });
+                        startSuggestions.classList.add('active');
+                    } else {
+                        const noData = document.createElement('div');
+                        noData.className = 'location-suggestion';
+                        noData.textContent = 'Không tìm thấy dữ liệu';
+                        noData.style.cursor = 'default';
+                        startSuggestions.appendChild(noData);
+                        startSuggestions.classList.add('active');
+                    }
                 }
+            }
+
+            startInput.addEventListener('input', () => {
+                const query = normalizeVietnameseText(startInput.value);
+                updateSuggestions(query);
+                startInput.dataset.index = '';
+                updateMarkers();
             });
 
             startInput.addEventListener('focus', () => {
-                if (startInput.value && startSuggestions.children.length > 0) {
-                    startSuggestions.classList.add('active');
-                }
+                updateSuggestions(normalizeVietnameseText(startInput.value));
             });
 
             startInput.addEventListener('blur', () => {
@@ -528,28 +559,12 @@
             });
 
             startArrow.addEventListener('click', () => {
+                updateSuggestions();
                 if (startSuggestions.classList.contains('active')) {
                     startSuggestions.classList.remove('active');
                     startArrow.classList.remove('fa-chevron-up');
                     startArrow.classList.add('fa-chevron-down');
                 } else {
-                    startSuggestions.innerHTML = '';
-                    stores.forEach((store, idx) => {
-                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                        const div = document.createElement('div');
-                        div.className = 'location-suggestion';
-                        div.textContent = store.name;
-                        div.dataset.index = storeIdx;
-                        div.addEventListener('click', () => {
-                            startInput.value = store.name;
-                            startInput.dataset.index = storeIdx;
-                            startSuggestions.classList.remove('active');
-                            startArrow.classList.remove('fa-chevron-up');
-                            startArrow.classList.add('fa-chevron-down');
-                            updateMarkers();
-                        });
-                        startSuggestions.appendChild(div);
-                    });
                     startSuggestions.classList.add('active');
                     startArrow.classList.remove('fa-chevron-down');
                     startArrow.classList.add('fa-chevron-up');
@@ -604,45 +619,55 @@
                     container.appendChild(inputContainer);
                     destinationsList.appendChild(container);
 
-                    input.addEventListener('input', () => {
-                        const query = normalizeVietnameseText(input.value);
+                    function updateSuggestions(query = '') {
                         suggestions.innerHTML = '';
-                        if (query.length < 1) {
-                            suggestions.classList.remove('active');
-                            input.dataset.index = '';
-                            updateMarkers();
-                            return;
-                        }
-
-                        const suggestionsList = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
-                        if (suggestionsList.length > 0) {
-                            suggestionsList.forEach((store, idx) => {
-                                const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                                const div = document.createElement('div');
-                                div.className = 'location-suggestion';
-                                div.textContent = store.name;
-                                div.dataset.index = storeIdx;
-                                div.addEventListener('click', () => {
-                                    input.value = store.name;
-                                    input.dataset.index = storeIdx;
-                                    suggestions.classList.remove('active');
-                                    arrow.classList.remove('fa-chevron-up');
-                                    arrow.classList.add('fa-chevron-down');
-                                    updateMarkers();
-                                });
-                                suggestions.appendChild(div);
-                            });
+                        if (query.length < 1 || stores.length === 0) {
+                            const noData = document.createElement('div');
+                            noData.className = 'location-suggestion';
+                            noData.textContent = 'Không tìm thấy dữ liệu';
+                            noData.style.cursor = 'default';
+                            suggestions.appendChild(noData);
                             suggestions.classList.add('active');
                         } else {
-                            input.dataset.index = '';
-                            updateMarkers();
+                            const suggestionsList = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                            if (suggestionsList.length > 0) {
+                                suggestionsList.forEach((store, idx) => {
+                                    const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                                    const div = document.createElement('div');
+                                    div.className = 'location-suggestion';
+                                    div.textContent = store.name;
+                                    div.dataset.index = storeIdx;
+                                    div.addEventListener('click', () => {
+                                        input.value = store.name;
+                                        input.dataset.index = storeIdx;
+                                        suggestions.classList.remove('active');
+                                        arrow.classList.remove('fa-chevron-up');
+                                        arrow.classList.add('fa-chevron-down');
+                                        updateMarkers();
+                                    });
+                                    suggestions.appendChild(div);
+                                });
+                                suggestions.classList.add('active');
+                            } else {
+                                const noData = document.createElement('div');
+                                noData.className = 'location-suggestion';
+                                noData.textContent = 'Không tìm thấy dữ liệu';
+                                noData.style.cursor = 'default';
+                                suggestions.appendChild(noData);
+                                suggestions.classList.add('active');
+                            }
                         }
+                    }
+
+                    input.addEventListener('input', () => {
+                        const query = normalizeVietnameseText(input.value);
+                        updateSuggestions(query);
+                        input.dataset.index = '';
+                        updateMarkers();
                     });
 
                     input.addEventListener('focus', () => {
-                        if (input.value && suggestions.children.length > 0) {
-                            suggestions.classList.add('active');
-                        }
+                        updateSuggestions(normalizeVietnameseText(input.value));
                     });
 
                     input.addEventListener('blur', () => {
@@ -656,28 +681,12 @@
                     });
 
                     arrow.addEventListener('click', () => {
+                        updateSuggestions();
                         if (suggestions.classList.contains('active')) {
                             suggestions.classList.remove('active');
                             arrow.classList.remove('fa-chevron-up');
                             arrow.classList.add('fa-chevron-down');
                         } else {
-                            suggestions.innerHTML = '';
-                            stores.forEach((store, idx) => {
-                                const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                                const div = document.createElement('div');
-                                div.className = 'location-suggestion';
-                                div.textContent = store.name;
-                                div.dataset.index = storeIdx;
-                                div.addEventListener('click', () => {
-                                    input.value = store.name;
-                                    input.dataset.index = storeIdx;
-                                    suggestions.classList.remove('active');
-                                    arrow.classList.remove('fa-chevron-up');
-                                    arrow.classList.add('fa-chevron-down');
-                                    updateMarkers();
-                                });
-                                suggestions.appendChild(div);
-                            });
                             suggestions.classList.add('active');
                             arrow.classList.remove('fa-chevron-down');
                             arrow.classList.add('fa-chevron-up');
@@ -704,47 +713,58 @@
             const searchSuggestions = document.getElementById('searchSuggestions');
             const searchArrow = document.getElementById('searchArrow');
 
-            storeSearch.addEventListener('input', () => {
-                const query = normalizeVietnameseText(storeSearch.value);
+            function updateSuggestions(query = '') {
                 searchSuggestions.innerHTML = '';
-                if (query.length < 1) {
-                    searchSuggestions.classList.remove('active');
-                    clearSearchMarker();
-                    return;
-                }
-
-                const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
-                if (suggestions.length > 0) {
-                    suggestions.forEach((store, idx) => {
-                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                        const div = document.createElement('div');
-                        div.className = 'search-suggestion';
-                        div.textContent = store.name;
-                        div.dataset.index = storeIdx;
-                        div.addEventListener('mousedown', (e) => {
-                            e.preventDefault();
-                            storeSearch.value = store.name;
-                            searchSuggestions.classList.remove('active');
-                            searchArrow.classList.remove('fa-chevron-up');
-                            searchArrow.classList.add('fa-chevron-down');
-                            clearSearchMarker();
-                            searchMarker = L.marker([store.lat, store.lng])
-                                .addTo(map)
-                                .bindPopup(`<b>${store.name}</b>`);
-                            map.setView([store.lat, store.lng], 15);
-                        });
-                        searchSuggestions.appendChild(div);
-                    });
+                if (query.length < 1 || stores.length === 0) {
+                    const noData = document.createElement('div');
+                    noData.className = 'search-suggestion';
+                    noData.textContent = 'Không tìm thấy dữ liệu';
+                    noData.style.cursor = 'default';
+                    searchSuggestions.appendChild(noData);
                     searchSuggestions.classList.add('active');
                 } else {
-                    clearSearchMarker();
+                    const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                    if (suggestions.length > 0) {
+                        suggestions.forEach((store, idx) => {
+                            const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                            const div = document.createElement('div');
+                            div.className = 'search-suggestion';
+                            div.textContent = store.name;
+                            div.dataset.index = storeIdx;
+                            div.addEventListener('mousedown', (e) => {
+                                e.preventDefault();
+                                storeSearch.value = store.name;
+                                searchSuggestions.classList.remove('active');
+                                searchArrow.classList.remove('fa-chevron-up');
+                                searchArrow.classList.add('fa-chevron-down');
+                                clearSearchMarker();
+                                searchMarker = L.marker([store.lat, store.lng])
+                                    .addTo(map)
+                                    .bindPopup(`<b>${store.name}</b>`);
+                                map.setView([store.lat, store.lng], 15);
+                            });
+                            searchSuggestions.appendChild(div);
+                        });
+                        searchSuggestions.classList.add('active');
+                    } else {
+                        const noData = document.createElement('div');
+                        noData.className = 'search-suggestion';
+                        noData.textContent = 'Không tìm thấy dữ liệu';
+                        noData.style.cursor = 'default';
+                        searchSuggestions.appendChild(noData);
+                        searchSuggestions.classList.add('active');
+                    }
                 }
+            }
+
+            storeSearch.addEventListener('input', () => {
+                const query = normalizeVietnameseText(storeSearch.value);
+                updateSuggestions(query);
+                clearSearchMarker();
             });
 
             storeSearch.addEventListener('focus', () => {
-                if (storeSearch.value && searchSuggestions.children.length > 0) {
-                    searchSuggestions.classList.add('active');
-                }
+                updateSuggestions(normalizeVietnameseText(storeSearch.value));
             });
 
             storeSearch.addEventListener('blur', () => {
@@ -758,32 +778,12 @@
             });
 
             searchArrow.addEventListener('click', () => {
+                updateSuggestions();
                 if (searchSuggestions.classList.contains('active')) {
                     searchSuggestions.classList.remove('active');
                     searchArrow.classList.remove('fa-chevron-up');
                     searchArrow.classList.add('fa-chevron-down');
                 } else {
-                    searchSuggestions.innerHTML = '';
-                    stores.forEach((store, idx) => {
-                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                        const div = document.createElement('div');
-                        div.className = 'search-suggestion';
-                        div.textContent = store.name;
-                        div.dataset.index = storeIdx;
-                        div.addEventListener('mousedown', (e) => {
-                            e.preventDefault();
-                            storeSearch.value = store.name;
-                            searchSuggestions.classList.remove('active');
-                            searchArrow.classList.remove('fa-chevron-up');
-                            searchArrow.classList.add('fa-chevron-down');
-                            clearSearchMarker();
-                            searchMarker = L.marker([store.lat, store.lng])
-                                .addTo(map)
-                                .bindPopup(`<b>${store.name}</b>`);
-                            map.setView([store.lat, store.lng], 15);
-                        });
-                        searchSuggestions.appendChild(div);
-                    });
                     searchSuggestions.classList.add('active');
                     searchArrow.classList.remove('fa-chevron-down');
                     searchArrow.classList.add('fa-chevron-up');
@@ -923,20 +923,20 @@
             const loggedInUser = localStorage.getItem('loggedInUser');
             const loginLink = document.getElementById('loginLink');
             const loginText = document.getElementById('loginText');
-            const logoutButton = document.getElementById('logoutButton');
+            const logoutDropdown = document.getElementById('logoutDropdown');
 
             if (loggedInUser) {
                 loginText.textContent = loggedInUser;
                 loginLink.href = '#';
                 loginLink.style.cursor = 'pointer';
-                loginLink.onclick = toggleLogoutButton;
+                loginLink.onclick = toggleLogoutDropdown;
             }
         };
 
-        function toggleLogoutButton(e) {
+        function toggleLogoutDropdown(e) {
             e.preventDefault();
-            const logoutButton = document.getElementById('logoutButton');
-            logoutButton.classList.toggle('hidden');
+            const logoutDropdown = document.getElementById('logoutDropdown');
+            logoutDropdown.classList.toggle('active');
         }
 
         function handleLogout() {
@@ -946,6 +946,15 @@
 
         // Add event listener for logout button
         document.getElementById('logoutButton').addEventListener('click', handleLogout);
+
+        // Hide logout dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const logoutDropdown = document.getElementById('logoutDropdown');
+            const userSection = document.getElementById('userSection');
+            if (!userSection.contains(e.target)) {
+                logoutDropdown.classList.remove('active');
+            }
+        });
     </script>
 </body>
 </html>
