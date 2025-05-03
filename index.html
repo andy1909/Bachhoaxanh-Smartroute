@@ -59,14 +59,31 @@
         }
         .search-container {
             position: relative;
+            display: flex;
+            align-items: center;
         }
         .search-bar { 
             width: 300px; 
-            padding: 8px; 
+            padding: 8px 30px 8px 8px; 
             border: 1px solid #ccc; 
             border-radius: 20px; 
             outline: none;
             position: relative;
+            box-sizing: border-box;
+            color: black;
+            caret-color: black;
+        }
+        .search-bar::placeholder {
+            color: #666;
+        }
+        .search-arrow {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            cursor: pointer;
+            z-index: 1001;
         }
         .search-suggestions {
             position: absolute;
@@ -80,6 +97,7 @@
             overflow-y: auto;
             display: none;
             z-index: 1001;
+            margin-top: 2px;
         }
         .search-suggestions.active {
             display: block;
@@ -87,36 +105,86 @@
         .search-suggestion {
             padding: 8px;
             cursor: pointer;
+            color: black;
         }
         .search-suggestion:hover {
             background-color: #f0f0f0;
         }
-        .nav-links a { 
+        .nav-links { 
+            display: flex; 
+            align-items: center;
+        }
+        .nav-links a, .nav-links button { 
             color: white; 
             margin-left: 20px; 
             text-decoration: none; 
             font-weight: 500; 
+            background: none;
+            border: none;
+            cursor: pointer;
         }
-        .nav-links a:hover { text-decoration: underline; }
+        .nav-links a:hover, .nav-links button:hover { 
+            text-decoration: underline; 
+        }
         .sidebar { 
             position: fixed; 
             top: 80px; 
             left: 0; 
-            width: 300px; 
+            width: 350px;
             height: calc(100vh - 80px - 70px); 
             background-color: #f8f9fa; 
             z-index: 1000; 
             padding: 20px; 
             box-shadow: 2px 0 5px rgba(0,0,0,0.1); 
             overflow-y: auto; 
+            display: none;
         }
-        .dropdown { 
+        .sidebar.active {
+            display: block;
+        }
+        .input-container {
+            position: relative;
+            width: 100%;
+        }
+        .location-input { 
             width: 100%; 
             padding: 8px; 
+            padding-right: 30px; 
             margin: 5px 0; 
             border: 1px solid #ccc; 
             border-radius: 4px; 
             background-color: white;
+        }
+        .dropdown-arrow {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            cursor: pointer;
+        }
+        .location-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1002;
+        }
+        .location-suggestions.active {
+            display: block;
+        }
+        .location-suggestion {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .location-suggestion:hover {
+            background-color: #f0f0f0;
         }
         .number-input { 
             width: 100%; 
@@ -197,24 +265,28 @@
         </div>
         <div class="search-container">
             <input type="text" id="storeSearch" class="search-bar" placeholder="Tìm cửa hàng...">
+            <i class="fas fa-chevron-down search-arrow" id="searchArrow"></i>
             <div class="search-suggestions" id="searchSuggestions"></div>
         </div>
         <div class="nav-links">
-            <a href="#"><i class="fas fa-user"></i> Đăng Nhập</a>
+            <button id="routingButton"><i class="fas fa-route"></i> Routing</button>
+            <a href="login.html" id="loginLink"><i class="fas fa-user"></i> <span id="loginText">Đăng Nhập</span></a>
         </div>
     </header>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
+    <!-- Sidebar (Hidden by Default) -->
+    <div class="sidebar" id="routingSidebar">
         <div class="mt-4">
             <label class="block text-lg font-bold text-green-700">Tải dữ liệu cửa hàng</label>
             <input type="file" id="storeFile" class="file-input" accept=".xlsx,.csv">
             <button id="loadStores" class="mt-2 w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Tải dữ liệu</button>
             <div id="successMessage" class="success-message">Tải dữ liệu thành công</div>
             <label class="block text-lg font-bold text-green-700 mt-4">Tính Đường Đi</label>
-            <select id="startLocation" class="dropdown">
-                <option value="">Chọn điểm bắt đầu</option>
-            </select>
+            <div class="input-container">
+                <input type="text" id="startLocationInput" class="location-input" placeholder="Nhập điểm bắt đầu...">
+                <i class="fas fa-chevron-down dropdown-arrow" id="startDropdownArrow"></i>
+                <div class="location-suggestions" id="startLocationSuggestions"></div>
+            </div>
             <label class="block text-sm font-medium text-gray-700 mt-2">Số điểm đến</label>
             <input type="number" id="numDestinations" class="number-input" min="1" placeholder="Nhập số điểm đến">
             <button id="generateDestinations" class="mt-2 w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Tạo danh sách điểm đến</button>
@@ -242,7 +314,6 @@
     <script>
         // Initialize the map centered on Ho Chi Minh City
         const map = L.map('map', {
-            scrollWheelZoom: false,
             zoomControl: false
         }).setView([10.7769, 106.7009], 11);
 
@@ -254,12 +325,68 @@
             position: 'topright'
         }).addTo(map);
 
-        map.on('focus', () => { map.scrollWheelZoom.enable(); });
-        map.on('blur', () => { map.scrollWheelZoom.disable(); });
-        map.on('click', () => { map.scrollWheelZoom.enable(); });
-
         let stores = [];
         let markers = [];
+        let startMarker = null;
+        let destinationMarkers = [];
+        let searchMarker = null;
+
+        // Define custom red icon for destinations
+        const redIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            shadowSize: [41, 41]
+        });
+
+        // Function to clear all markers from the map
+        function clearAllMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            startMarker = null;
+            destinationMarkers = [];
+        }
+
+        // Function to clear search marker
+        function clearSearchMarker() {
+            if (searchMarker) {
+                map.removeLayer(searchMarker);
+                searchMarker = null;
+            }
+        }
+
+        // Function to update markers on the map
+        function updateMarkers() {
+            clearAllMarkers();
+
+            const startIndex = document.getElementById('startLocationInput').dataset.index || '';
+            if (startIndex !== '') {
+                startMarker = L.marker([stores[startIndex].lat, stores[startIndex].lng])
+                    .addTo(map)
+                    .bindPopup(`<b>${stores[startIndex].name}</b>`);
+                markers.push(startMarker);
+            }
+
+            const destinationInputs = document.querySelectorAll('.destination-container');
+            destinationInputs.forEach((container, idx) => {
+                const input = container.querySelector('input');
+                const index = input.dataset.index || '';
+                if (index !== '' && index !== startIndex) {
+                    const destMarker = L.marker([stores[index].lat, stores[index].lng], { icon: redIcon })
+                        .addTo(map)
+                        .bindPopup(`<b>${stores[index].name}</b>`);
+                    destinationMarkers.push(destMarker);
+                    markers.push(destMarker);
+                }
+            });
+
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds());
+            }
+        }
 
         // Function to process uploaded file
         document.getElementById('loadStores').addEventListener('click', () => {
@@ -295,9 +422,10 @@
                             lng: parseFloat(row['Kinh độ'])
                         })).filter(store => !isNaN(store.lat) && !isNaN(store.lng));
 
-                        updateStartDropdown();
-                        markers.forEach(marker => map.removeLayer(marker));
-                        markers = [];
+                        updateStartInput();
+                        updateDestinationInputs();
+                        updateStoreSearch();
+                        clearAllMarkers();
                         document.getElementById('successMessage').style.display = 'block';
                     },
                     error: (err) => alert('Lỗi khi xử lý file: ' + err.message)
@@ -306,161 +434,404 @@
             reader.readAsBinaryString(file);
         });
 
-        // Update start location dropdown and add default marker
-        function updateStartDropdown() {
-            const startDropdown = document.getElementById('startLocation');
-            startDropdown.innerHTML = '<option value="">Chọn điểm bắt đầu</option>';
-            stores.forEach((store, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = store.name;
-                startDropdown.appendChild(option);
+        // Function to normalize Vietnamese text by removing diacritics
+        function removeVietnameseDiacritics(str) {
+            const diacriticsMap = [
+                { base: 'A', chars: 'ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ' },
+                { base: 'E', chars: 'ÈÉẸẺẼÊỀẾỆỂỄ' },
+                { base: 'I', chars: 'ÌÍỊỈĨ' },
+                { base: 'O', chars: 'ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ' },
+                { base: 'U', chars: 'ÙÚỤỦŨƯỪỨỰỬỮ' },
+                { base: 'Y', chars: 'ỲÝỴỶỸ' },
+                { base: 'D', chars: 'Đ' },
+                { base: 'a', chars: 'àáạảãâầấậẩẫăằắặẳẵ' },
+                { base: 'e', chars: 'èéẹẻẽêềếệểễ' },
+                { base: 'i', chars: 'ìíịỉĩ' },
+                { base: 'o', chars: 'òóọỏõôồốộổỗơờớợởỡ' },
+                { base: 'u', chars: 'ùúụủũưừứựửữ' },
+                { base: 'y', chars: 'ỳýỵỷỹ' },
+                { base: 'd', chars: 'đ' },
+            ];
+
+            let normalized = str.toLowerCase();
+            for (const map of diacriticsMap) {
+                for (const char of map.chars) {
+                    normalized = normalized.replace(new RegExp(char, 'g'), map.base);
+                }
+            }
+            return normalized;
+        }
+
+        // Function to normalize Vietnamese text for comparison
+        function normalizeVietnameseText(text) {
+            return removeVietnameseDiacritics(text.toLowerCase());
+        }
+
+        // Update start location input
+        function updateStartInput() {
+            const startInput = document.getElementById('startLocationInput');
+            const startSuggestions = document.getElementById('startLocationSuggestions');
+            const startArrow = document.getElementById('startDropdownArrow');
+
+            startInput.addEventListener('input', () => {
+                const query = normalizeVietnameseText(startInput.value);
+                startSuggestions.innerHTML = '';
+                if (query.length < 1) {
+                    startSuggestions.classList.remove('active');
+                    startInput.dataset.index = '';
+                    updateMarkers();
+                    return;
+                }
+
+                const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                if (suggestions.length > 0) {
+                    suggestions.forEach((store, idx) => {
+                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                        const div = document.createElement('div');
+                        div.className = 'location-suggestion';
+                        div.textContent = store.name;
+                        div.dataset.index = storeIdx;
+                        div.addEventListener('click', () => {
+                            startInput.value = store.name;
+                            startInput.dataset.index = storeIdx;
+                            startSuggestions.classList.remove('active');
+                            startArrow.classList.remove('fa-chevron-up');
+                            startArrow.classList.add('fa-chevron-down');
+                            updateMarkers();
+                        });
+                        startSuggestions.appendChild(div);
+                    });
+                    startSuggestions.classList.add('active');
+                } else {
+                    startInput.dataset.index = '';
+                    updateMarkers();
+                }
             });
 
-            startDropdown.addEventListener('change', () => {
-                const startIndex = startDropdown.value;
-                markers.forEach(marker => map.removeLayer(marker));
-                markers = [];
+            startInput.addEventListener('focus', () => {
+                if (startInput.value && startSuggestions.children.length > 0) {
+                    startSuggestions.classList.add('active');
+                }
+            });
 
-                if (startIndex !== '') {
-                    const startMarker = L.marker([stores[startIndex].lat, stores[startIndex].lng]).addTo(map).bindPopup(`<b>${stores[startIndex].name}</b>`);
-                    markers.push(startMarker);
-                    map.setView([stores[startIndex].lat, stores[startIndex].lng], 15);
+            startInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (!startSuggestions.contains(document.activeElement) && !startArrow.contains(document.activeElement)) {
+                        startSuggestions.classList.remove('active');
+                        startArrow.classList.remove('fa-chevron-up');
+                        startArrow.classList.add('fa-chevron-down');
+                    }
+                }, 200);
+            });
+
+            startArrow.addEventListener('click', () => {
+                if (startSuggestions.classList.contains('active')) {
+                    startSuggestions.classList.remove('active');
+                    startArrow.classList.remove('fa-chevron-up');
+                    startArrow.classList.add('fa-chevron-down');
+                } else {
+                    startSuggestions.innerHTML = '';
+                    stores.forEach((store, idx) => {
+                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                        const div = document.createElement('div');
+                        div.className = 'location-suggestion';
+                        div.textContent = store.name;
+                        div.dataset.index = storeIdx;
+                        div.addEventListener('click', () => {
+                            startInput.value = store.name;
+                            startInput.dataset.index = storeIdx;
+                            startSuggestions.classList.remove('active');
+                            startArrow.classList.remove('fa-chevron-up');
+                            startArrow.classList.add('fa-chevron-down');
+                            updateMarkers();
+                        });
+                        startSuggestions.appendChild(div);
+                    });
+                    startSuggestions.classList.add('active');
+                    startArrow.classList.remove('fa-chevron-down');
+                    startArrow.classList.add('fa-chevron-up');
+                    startInput.focus();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!startInput.contains(e.target) && !startSuggestions.contains(e.target) && !startArrow.contains(e.target)) {
+                    startSuggestions.classList.remove('active');
+                    startArrow.classList.remove('fa-chevron-up');
+                    startArrow.classList.add('fa-chevron-down');
                 }
             });
         }
 
-        // Generate destination dropdowns dynamically based on stores
-        const numDestinationsInput = document.getElementById('numDestinations');
-        const destinationsList = document.getElementById('destinationsList');
-        document.getElementById('generateDestinations').addEventListener('click', () => {
-            const num = parseInt(numDestinationsInput.value) || 0;
-            if (num < 1 || num > stores.length) {
-                alert(`Vui lòng nhập số điểm đến từ 1 đến ${stores.length}!`);
-                numDestinationsInput.value = Math.min(Math.max(num, 1), stores.length);
-                return;
-            }
+        // Update destination inputs
+        function updateDestinationInputs() {
+            const destinationsList = document.getElementById('destinationsList');
+            document.getElementById('generateDestinations').addEventListener('click', () => {
+                const num = parseInt(document.getElementById('numDestinations').value) || 0;
+                if (num < 1 || num > stores.length) {
+                    alert(`Vui lòng nhập số điểm đến từ 1 đến ${stores.length}!`);
+                    document.getElementById('numDestinations').value = Math.min(Math.max(num, 1), stores.length);
+                    return;
+                }
 
-            destinationsList.innerHTML = '';
-            for (let i = 0; i < num; i++) {
-                const label = document.createElement('label');
-                label.className = 'block text-sm font-medium text-gray-700 mt-2';
-                label.textContent = `Điểm đến ${i + 1}`;
-                const select = document.createElement('select');
-                select.className = 'dropdown';
-                select.id = `destination-${i}`;
-                const defaultOption = document.createElement('option');
-                defaultOption.value = '';
-                defaultOption.textContent = 'Chọn điểm đến';
-                select.appendChild(defaultOption);
-                stores.forEach((store, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = store.name;
-                    select.appendChild(option);
-                });
-                destinationsList.appendChild(label);
-                destinationsList.appendChild(select);
+                destinationsList.innerHTML = '';
+                for (let i = 0; i < num; i++) {
+                    const container = document.createElement('div');
+                    container.className = 'destination-container mt-2';
+                    const label = document.createElement('label');
+                    label.className = 'block text-sm font-medium text-gray-700';
+                    label.textContent = `Điểm đến ${i + 1}`;
+                    const inputContainer = document.createElement('div');
+                    inputContainer.className = 'input-container';
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = `destinationInput-${i}`;
+                    input.className = 'location-input';
+                    input.placeholder = `Nhập điểm đến ${i + 1}...`;
+                    const arrow = document.createElement('i');
+                    arrow.className = 'fas fa-chevron-down dropdown-arrow';
+                    arrow.id = `destinationArrow-${i}`;
+                    const suggestions = document.createElement('div');
+                    suggestions.id = `destinationSuggestions-${i}`;
+                    suggestions.className = 'location-suggestions';
+                    inputContainer.appendChild(input);
+                    inputContainer.appendChild(arrow);
+                    inputContainer.appendChild(suggestions);
+                    container.appendChild(label);
+                    container.appendChild(inputContainer);
+                    destinationsList.appendChild(container);
 
-                select.addEventListener('change', () => {
-                    const startIndex = document.getElementById('startLocation').value;
-                    const selectedIndices = [startIndex, ...Array.from(document.querySelectorAll('[id^="destination-"]')).map(sel => sel.value)].filter(index => index !== '');
-                    markers.forEach(marker => map.removeLayer(marker));
-                    markers = [];
+                    input.addEventListener('input', () => {
+                        const query = normalizeVietnameseText(input.value);
+                        suggestions.innerHTML = '';
+                        if (query.length < 1) {
+                            suggestions.classList.remove('active');
+                            input.dataset.index = '';
+                            updateMarkers();
+                            return;
+                        }
 
-                    if (startIndex !== '') {
-                        const startMarker = L.marker([stores[startIndex].lat, stores[startIndex].lng]).addTo(map).bindPopup(`<b>${stores[startIndex].name}</b>`);
-                        markers.push(startMarker);
-                    }
-
-                    document.querySelectorAll('[id^="destination-"]').forEach((sel, idx) => {
-                        const index = sel.value;
-                        if (index !== '' && !selectedIndices.slice(1).includes(index)) {
-                            const destMarker = L.marker([stores[index].lat, stores[index].lng]).addTo(map).bindPopup(`<b>${stores[index].name}</b>`);
-                            markers.push(destMarker);
+                        const suggestionsList = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                        if (suggestionsList.length > 0) {
+                            suggestionsList.forEach((store, idx) => {
+                                const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                                const div = document.createElement('div');
+                                div.className = 'location-suggestion';
+                                div.textContent = store.name;
+                                div.dataset.index = storeIdx;
+                                div.addEventListener('click', () => {
+                                    input.value = store.name;
+                                    input.dataset.index = storeIdx;
+                                    suggestions.classList.remove('active');
+                                    arrow.classList.remove('fa-chevron-up');
+                                    arrow.classList.add('fa-chevron-down');
+                                    updateMarkers();
+                                });
+                                suggestions.appendChild(div);
+                            });
+                            suggestions.classList.add('active');
+                        } else {
+                            input.dataset.index = '';
+                            updateMarkers();
                         }
                     });
 
-                    if (markers.length > 0) {
-                        const group = new L.featureGroup(markers);
-                        map.fitBounds(group.getBounds());
-                    }
-                });
-            }
-        });
+                    input.addEventListener('focus', () => {
+                        if (input.value && suggestions.children.length > 0) {
+                            suggestions.classList.add('active');
+                        }
+                    });
 
-        // Store search with autocomplete
-        const storeSearch = document.getElementById('storeSearch');
-        const searchSuggestions = document.getElementById('searchSuggestions');
+                    input.addEventListener('blur', () => {
+                        setTimeout(() => {
+                            if (!suggestions.contains(document.activeElement) && !arrow.contains(document.activeElement)) {
+                                suggestions.classList.remove('active');
+                                arrow.classList.remove('fa-chevron-up');
+                                arrow.classList.add('fa-chevron-down');
+                            }
+                        }, 200);
+                    });
 
-        storeSearch.addEventListener('input', () => {
-            const query = storeSearch.value.toLowerCase();
-            searchSuggestions.innerHTML = '';
-            if (query.length < 1) {
-                searchSuggestions.classList.remove('active');
-                return;
-            }
+                    arrow.addEventListener('click', () => {
+                        if (suggestions.classList.contains('active')) {
+                            suggestions.classList.remove('active');
+                            arrow.classList.remove('fa-chevron-up');
+                            arrow.classList.add('fa-chevron-down');
+                        } else {
+                            suggestions.innerHTML = '';
+                            stores.forEach((store, idx) => {
+                                const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                                const div = document.createElement('div');
+                                div.className = 'location-suggestion';
+                                div.textContent = store.name;
+                                div.dataset.index = storeIdx;
+                                div.addEventListener('click', () => {
+                                    input.value = store.name;
+                                    input.dataset.index = storeIdx;
+                                    suggestions.classList.remove('active');
+                                    arrow.classList.remove('fa-chevron-up');
+                                    arrow.classList.add('fa-chevron-down');
+                                    updateMarkers();
+                                });
+                                suggestions.appendChild(div);
+                            });
+                            suggestions.classList.add('active');
+                            arrow.classList.remove('fa-chevron-down');
+                            arrow.classList.add('fa-chevron-up');
+                            input.focus();
+                        }
+                    });
 
-            const suggestions = stores.filter((store, idx) => store.name.toLowerCase().includes(query));
-            suggestions.forEach((store, idx) => {
-                const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
-                const div = document.createElement('div');
-                div.className = 'search-suggestion';
-                div.textContent = store.name;
-                div.dataset.index = storeIdx;
-                div.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    storeSearch.value = store.name;
-                    searchSuggestions.classList.remove('active');
-                    map.setView([store.lat, store.lng], 15);
-                });
-                searchSuggestions.appendChild(div);
-            });
-            searchSuggestions.classList.add('active');
-        });
-
-        storeSearch.addEventListener('focus', () => {
-            if (storeSearch.value && searchSuggestions.children.length > 0) {
-                searchSuggestions.classList.add('active');
-            }
-        });
-
-        storeSearch.addEventListener('blur', () => {
-            setTimeout(() => {
-                if (!searchSuggestions.contains(document.activeElement)) {
-                    searchSuggestions.classList.remove('active');
+                    document.addEventListener('click', (e) => {
+                        if (!input.contains(e.target) && !suggestions.contains(e.target) && !arrow.contains(e.target)) {
+                            suggestions.classList.remove('active');
+                            arrow.classList.remove('fa-chevron-up');
+                            arrow.classList.add('fa-chevron-down');
+                        }
+                    });
                 }
-            }, 200);
+
+                updateMarkers();
+            });
+        }
+
+        // Update store search input
+        function updateStoreSearch() {
+            const storeSearch = document.getElementById('storeSearch');
+            const searchSuggestions = document.getElementById('searchSuggestions');
+            const searchArrow = document.getElementById('searchArrow');
+
+            storeSearch.addEventListener('input', () => {
+                const query = normalizeVietnameseText(storeSearch.value);
+                searchSuggestions.innerHTML = '';
+                if (query.length < 1) {
+                    searchSuggestions.classList.remove('active');
+                    clearSearchMarker();
+                    return;
+                }
+
+                const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                if (suggestions.length > 0) {
+                    suggestions.forEach((store, idx) => {
+                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                        const div = document.createElement('div');
+                        div.className = 'search-suggestion';
+                        div.textContent = store.name;
+                        div.dataset.index = storeIdx;
+                        div.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            storeSearch.value = store.name;
+                            searchSuggestions.classList.remove('active');
+                            searchArrow.classList.remove('fa-chevron-up');
+                            searchArrow.classList.add('fa-chevron-down');
+                            clearSearchMarker();
+                            searchMarker = L.marker([store.lat, store.lng])
+                                .addTo(map)
+                                .bindPopup(`<b>${store.name}</b>`);
+                            map.setView([store.lat, store.lng], 15);
+                        });
+                        searchSuggestions.appendChild(div);
+                    });
+                    searchSuggestions.classList.add('active');
+                } else {
+                    clearSearchMarker();
+                }
+            });
+
+            storeSearch.addEventListener('focus', () => {
+                if (storeSearch.value && searchSuggestions.children.length > 0) {
+                    searchSuggestions.classList.add('active');
+                }
+            });
+
+            storeSearch.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (!searchSuggestions.contains(document.activeElement) && !searchArrow.contains(document.activeElement)) {
+                        searchSuggestions.classList.remove('active');
+                        searchArrow.classList.remove('fa-chevron-up');
+                        searchArrow.classList.add('fa-chevron-down');
+                    }
+                }, 200);
+            });
+
+            searchArrow.addEventListener('click', () => {
+                if (searchSuggestions.classList.contains('active')) {
+                    searchSuggestions.classList.remove('active');
+                    searchArrow.classList.remove('fa-chevron-up');
+                    searchArrow.classList.add('fa-chevron-down');
+                } else {
+                    searchSuggestions.innerHTML = '';
+                    stores.forEach((store, idx) => {
+                        const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                        const div = document.createElement('div');
+                        div.className = 'search-suggestion';
+                        div.textContent = store.name;
+                        div.dataset.index = storeIdx;
+                        div.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            storeSearch.value = store.name;
+                            searchSuggestions.classList.remove('active');
+                            searchArrow.classList.remove('fa-chevron-up');
+                            searchArrow.classList.add('fa-chevron-down');
+                            clearSearchMarker();
+                            searchMarker = L.marker([store.lat, store.lng])
+                                .addTo(map)
+                                .bindPopup(`<b>${store.name}</b>`);
+                            map.setView([store.lat, store.lng], 15);
+                        });
+                        searchSuggestions.appendChild(div);
+                    });
+                    searchSuggestions.classList.add('active');
+                    searchArrow.classList.remove('fa-chevron-down');
+                    searchArrow.classList.add('fa-chevron-up');
+                    storeSearch.focus();
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!storeSearch.contains(e.target) && !searchSuggestions.contains(e.target) && !searchArrow.contains(e.target)) {
+                    searchSuggestions.classList.remove('active');
+                    searchArrow.classList.remove('fa-chevron-up');
+                    searchArrow.classList.add('fa-chevron-down');
+                }
+            });
+        }
+
+        // Toggle Routing Sidebar
+        document.getElementById('routingButton').addEventListener('click', () => {
+            const sidebar = document.getElementById('routingSidebar');
+            sidebar.classList.toggle('active');
         });
 
         // Route calculation
         let routeLayers = [];
         document.getElementById('calculateRoute').addEventListener('click', async () => {
-            const startIndex = document.getElementById('startLocation').value;
+            const startIndex = document.getElementById('startLocationInput').dataset.index || '';
             if (startIndex === '') {
                 alert('Vui lòng chọn điểm bắt đầu!');
                 return;
             }
 
             const destinationIndices = [];
-            const numDestinations = parseInt(numDestinationsInput.value) || 0;
+            const numDestinations = parseInt(document.getElementById('numDestinations').value) || 0;
             if (numDestinations < 1) {
                 alert('Vui lòng tạo danh sách điểm đến trước!');
                 return;
             }
 
+            const destinationInputs = document.querySelectorAll('.destination-container');
             for (let i = 0; i < numDestinations; i++) {
-                const select = document.getElementById(`destination-${i}`);
-                if (!select) {
+                const input = destinationInputs[i].querySelector('input');
+                if (!input) {
                     alert('Vui lòng tạo danh sách điểm đến trước!');
                     return;
                 }
-                const index = select.value;
+                const index = input.dataset.index || '';
                 if (index === '') {
                     alert(`Vui lòng chọn điểm đến ${i + 1}!`);
                     return;
                 }
-                if (index == startIndex) {
+                if (index === startIndex) {
                     alert(`Điểm đến ${i + 1} trùng với điểm bắt đầu! Vui lòng chọn điểm khác.`);
                     return;
                 }
@@ -543,6 +914,18 @@
                 routeInfo.style.display = 'none';
             }
         });
+
+        // Check if user is logged in
+        window.onload = function() {
+            const loggedInUser = localStorage.getItem('loggedInUser');
+            const loginLink = document.getElementById('loginLink');
+            const loginText = document.getElementById('loginText');
+            if (loggedInUser) {
+                loginText.textContent = loggedInUser;
+                loginLink.href = '#'; // Disable the link since user is logged in
+                loginLink.onclick = (e) => e.preventDefault(); // Prevent navigation
+            }
+        };
     </script>
 </body>
 </html>
