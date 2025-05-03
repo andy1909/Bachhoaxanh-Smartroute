@@ -270,7 +270,10 @@
         </div>
         <div class="nav-links">
             <button id="routingButton"><i class="fas fa-route"></i> Routing</button>
-            <a href="login.html" id="loginLink"><i class="fas fa-user"></i> <span id="loginText">Đăng Nhập</span></a>
+            <div id="userSection">
+                <a href="login.html" id="loginLink"><i class="fas fa-user"></i> <span id="loginText">Đăng Nhập</span></a>
+                <button id="logoutButton" class="ml-2 bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 hidden">Đăng Xuất</button>
+            </div>
         </div>
     </header>
 
@@ -915,17 +918,34 @@
             }
         });
 
-        // Check if user is logged in
+        // Check if user is logged in and add logout functionality
         window.onload = function() {
             const loggedInUser = localStorage.getItem('loggedInUser');
             const loginLink = document.getElementById('loginLink');
             const loginText = document.getElementById('loginText');
+            const logoutButton = document.getElementById('logoutButton');
+
             if (loggedInUser) {
                 loginText.textContent = loggedInUser;
-                loginLink.href = '#'; // Disable the link since user is logged in
-                loginLink.onclick = (e) => e.preventDefault(); // Prevent navigation
+                loginLink.href = '#';
+                loginLink.style.cursor = 'pointer';
+                loginLink.onclick = toggleLogoutButton;
             }
         };
+
+        function toggleLogoutButton(e) {
+            e.preventDefault();
+            const logoutButton = document.getElementById('logoutButton');
+            logoutButton.classList.toggle('hidden');
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('loggedInUser');
+            window.location.href = 'login.html';
+        }
+
+        // Add event listener for logout button
+        document.getElementById('logoutButton').addEventListener('click', handleLogout);
     </script>
 </body>
 </html>
