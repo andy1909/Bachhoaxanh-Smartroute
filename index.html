@@ -10,9 +10,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for XLSX to CSV conversion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Papa Parse for CSV parsing -->
+    <script src="https://unpkg.com/papaparse@latest/papaparse.min.js"></script>
     <style>
-        body { font-family: 'Arial', sans-serif; }
-        #map { height: calc(100vh - 80px); width: 100%; margin-top: 80px; }
+        body { 
+            font-family: 'Arial', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            height: 100vh; 
+            overflow-y: auto; 
+        }
+        #map { 
+            height: calc(100vh - 80px); 
+            width: 100%; 
+            margin-top: 80px; 
+            position: relative;
+        }
         .header { 
             background-color: #28a745; 
             color: white; 
@@ -29,13 +44,52 @@
         .logo img { 
             height: 50px; 
             width: auto; 
+            max-width: 100%; 
+            object-fit: contain;
+        }
+        @media (max-width: 768px) {
+            .logo img {
+                height: 40px;
+            }
+        }
+        @media (max-width: 480px) {
+            .logo img {
+                height: 30px;
+            }
+        }
+        .search-container {
+            position: relative;
         }
         .search-bar { 
             width: 300px; 
             padding: 8px; 
-            border: none; 
+            border: 1px solid #ccc; 
             border-radius: 20px; 
             outline: none;
+            position: relative;
+        }
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 300px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1001;
+        }
+        .search-suggestions.active {
+            display: block;
+        }
+        .search-suggestion {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .search-suggestion:hover {
+            background-color: #f0f0f0;
         }
         .nav-links a { 
             color: white; 
@@ -49,11 +103,12 @@
             top: 80px; 
             left: 0; 
             width: 300px; 
-            height: calc(100vh - 80px); 
+            height: calc(100vh - 80px - 70px); 
             background-color: #f8f9fa; 
             z-index: 1000; 
             padding: 20px; 
             box-shadow: 2px 0 5px rgba(0,0,0,0.1); 
+            overflow-y: auto; 
         }
         .dropdown { 
             width: 100%; 
@@ -70,6 +125,14 @@
             border: 1px solid #ccc; 
             border-radius: 4px; 
         }
+        .file-input { 
+            width: 100%; 
+            padding: 8px; 
+            margin: 5px 0; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            background-color: white;
+        }
         .info-box { 
             margin-top: 10px; 
             padding: 10px; 
@@ -79,6 +142,16 @@
             max-height: 200px; 
             overflow-y: auto; 
         }
+        .success-message { 
+            margin-top: 10px; 
+            padding: 10px; 
+            background-color: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+            border-radius: 4px; 
+            display: none; 
+            text-align: center; 
+        }
         .footer { 
             background-color: #28a745; 
             color: white; 
@@ -87,7 +160,9 @@
             position: fixed; 
             bottom: 0; 
             width: 100%; 
+            height: 70px; 
             z-index: 1000;
+            margin-bottom: 0;
         }
         .footer a { 
             color: #ffeb3b; 
@@ -95,19 +170,36 @@
             margin: 0 10px;
         }
         .footer a:hover { text-decoration: underline; }
+        .leaflet-control-zoom {
+            position: fixed !important;
+            right: 10px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            background-color: rgba(255, 255, 255, 0.8) !important;
+            border-radius: 5px !important;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4) !important;
+            padding: 5px !important;
+            font-size: 14px !important;
+        }
+        .leaflet-control-zoom a {
+            width: 22px !important;
+            height: 22px !important;
+            line-height: 22px !important;
+            font-size: 16px !important;
+        }
     </style>
 </head>
-<body class="m-0 p-0">
+<body>
     <!-- Header -->
     <header class="header">
         <div class="logo">
-            <img src="https://via.placeholder.com/150x50.png?text=BHX+Logo" alt="Bách Hóa Xanh Logo">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABeSURBVFhH7dNBDQAgDAPB+5/0sYMtWgiM1t3r0M7M7gA2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDuAy2bNAKxYvYkWAAAAAElFTkSuQmCC" alt="Bách Hóa Xanh Logo">
         </div>
-        <input type="text" class="search-bar" placeholder="Tìm kiếm sản phẩm...">
+        <div class="search-container">
+            <input type="text" id="storeSearch" class="search-bar" placeholder="Tìm cửa hàng...">
+            <div class="search-suggestions" id="searchSuggestions"></div>
+        </div>
         <div class="nav-links">
-            <a href="#">Trang Chủ</a>
-            <a href="#">Sản Phẩm</a>
-            <a href="#">Khuyến Mãi</a>
             <a href="#"><i class="fas fa-user"></i> Đăng Nhập</a>
         </div>
     </header>
@@ -115,12 +207,16 @@
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="mt-4">
-            <label class="block text-lg font-bold text-green-700">Tính Đường Đi</label>
+            <label class="block text-lg font-bold text-green-700">Tải dữ liệu cửa hàng</label>
+            <input type="file" id="storeFile" class="file-input" accept=".xlsx,.csv">
+            <button id="loadStores" class="mt-2 w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Tải dữ liệu</button>
+            <div id="successMessage" class="success-message">Tải dữ liệu thành công</div>
+            <label class="block text-lg font-bold text-green-700 mt-4">Tính Đường Đi</label>
             <select id="startLocation" class="dropdown">
                 <option value="">Chọn điểm bắt đầu</option>
             </select>
             <label class="block text-sm font-medium text-gray-700 mt-2">Số điểm đến</label>
-            <input type="number" id="numDestinations" class="number-input" min="1" max="10" placeholder="Nhập số điểm đến (1-10)">
+            <input type="number" id="numDestinations" class="number-input" min="1" placeholder="Nhập số điểm đến">
             <button id="generateDestinations" class="mt-2 w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Tạo danh sách điểm đến</button>
             <div id="destinationsList" class="mt-2"></div>
             <button id="calculateRoute" class="mt-2 w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">Tính đường đi</button>
@@ -135,9 +231,9 @@
     <footer class="footer">
         <p>© 2025 Bách Hóa Xanh. All Rights Reserved.</p>
         <p>
-            <a href="https://www.bachhoaxanh.com">Trang Chủ</a> |
-            <a href="https://www.facebook.com/sieuthibachhoaxanh">Fanpage</a> |
-            <a href="https://www.youtube.com/c/BáchHoáXANHcom">YouTube</a>
+            <a href="https://www.bachhoaxanh.com/?srsltid=AfmBOorReHLifzL_5vYaNlYhfMSZMKcZCakmhOmLTMl4tajXkv4ltETI">Trang Chủ</a> |
+            <a href="https://www.facebook.com/sieuthibachhoaxanh/?locale=vi_VN">Fanpage</a> |
+            <a href="https://www.youtube.com/watch?v=EJanZHX1mb0">YouTube</a>
         </p>
     </footer>
 
@@ -145,69 +241,107 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Initialize the map centered on Ho Chi Minh City
-        const map = L.map('map').setView([10.7769, 106.7009], 11);
+        const map = L.map('map', {
+            scrollWheelZoom: false,
+            zoomControl: false
+        }).setView([10.7769, 106.7009], 11);
 
-        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Warehouse data
-        const warehouses = [
-            { name: "Kho Bách Hóa Xanh - Quận 7", lat: 10.738, lng: 106.7217, hours: "6:30 – 21:30", goods: "Rau củ, Thịt cá, FMCG" },
-            { name: "Kho Bách Hóa Xanh - Thủ Đức", lat: 10.87, lng: 106.7675, hours: "6:30 – 21:30", goods: "Rau củ, FMCG" },
-            { name: "Kho Bách Hóa Xanh - Bình Tân", lat: 10.7629, lng: 106.5938, hours: "6:30 – 21:30", goods: "Rau củ, FMCG, Đồ đông lạnh" },
-            { name: "Kho Bách Hóa Xanh - Gò Vấp", lat: 10.8389, lng: 106.6687, hours: "6:30 – 21:30", goods: "Rau củ, FMCG, Sữa" },
-            { name: "Kho Bách Hóa Xanh - Củ Chi", lat: 11.005, lng: 106.5, hours: "6:30 – 21:30", goods: "Rau củ, FMCG" },
-            { name: "Kho Bách Hóa Xanh - Nhà Bè", lat: 10.64, lng: 106.738, hours: "6:30 – 21:30", goods: "Rau củ, FMCG, Đồ hộp" },
-            { name: "Kho Bách Hóa Xanh - Hóc Môn", lat: 10.8916, lng: 106.6084, hours: "6:30 – 21:30", goods: "Rau củ, FMCG, Bánh kẹo" },
-            { name: "Kho Bách Hóa Xanh - Tân Bình", lat: 10.8017, lng: 106.652, hours: "6:30 – 21:30", goods: "Rau củ, FMCG" },
-            { name: "Kho Bách Hóa Xanh - Quận 8", lat: 10.724, lng: 106.6285, hours: "6:30 – 21:30", goods: "Rau củ, FMCG, Gia vị" },
-            { name: "Kho Bách Hóa Xanh - Quận 12", lat: 10.8556, lng: 106.6438, hours: "6:30 – 21:30", goods: "Rau củ, FMCG, Đồ uống" }
-        ];
+        L.control.zoom({
+            position: 'topright'
+        }).addTo(map);
 
-        // Add markers for each warehouse
-        const markers = [];
-        warehouses.forEach(warehouse => {
-            const marker = L.marker([warehouse.lat, warehouse.lng], {
-                icon: L.icon({
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41]
-                })
-            }).addTo(map);
-            marker.bindPopup(`
-                <b>${warehouse.name}</b><br>
-                Thời gian hoạt động: ${warehouse.hours}<br>
-                Các loại mặt hàng: ${warehouse.goods}<br>
-                Giao hàng: Tốt, 50 đơn hàng, Đảm bảo
-            `);
-            markers.push(marker);
-        });
+        map.on('focus', () => { map.scrollWheelZoom.enable(); });
+        map.on('blur', () => { map.scrollWheelZoom.disable(); });
+        map.on('click', () => { map.scrollWheelZoom.enable(); });
 
-        // Populate start location dropdown
-        const startDropdown = document.getElementById('startLocation');
-        warehouses.forEach((warehouse, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = warehouse.name;
-            startDropdown.appendChild(option);
-        });
+        let stores = [];
+        let markers = [];
 
-        // Generate destination dropdowns dynamically
-        const numDestinationsInput = document.getElementById('numDestinations');
-        const destinationsList = document.getElementById('destinationsList');
-        document.getElementById('generateDestinations').addEventListener('click', () => {
-            const num = parseInt(numDestinationsInput.value);
-            if (isNaN(num) || num < 1 || num > 10) {
-                alert('Vui lòng nhập số điểm đến từ 1 đến 10!');
+        // Function to process uploaded file
+        document.getElementById('loadStores').addEventListener('click', () => {
+            const fileInput = document.getElementById('storeFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Vui lòng chọn file dữ liệu!');
                 return;
             }
 
-            // Clear previous dropdowns
-            destinationsList.innerHTML = '';
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = e.target.result;
+                let csvData;
+                if (file.name.endsWith('.xlsx')) {
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    csvData = XLSX.utils.sheet_to_csv(worksheet);
+                } else {
+                    csvData = data;
+                }
 
-            // Generate dropdowns
+                Papa.parse(csvData, {
+                    header: true,
+                    skipEmptyLines: true,
+                    transformHeader: (header) => header.trim(),
+                    transform: (value) => value.trim(),
+                    complete: (results) => {
+                        stores = results.data.map(row => ({
+                            name: row['Địa chỉ cửa hàng'],
+                            lat: parseFloat(row['Vĩ độ']),
+                            lng: parseFloat(row['Kinh độ'])
+                        })).filter(store => !isNaN(store.lat) && !isNaN(store.lng));
+
+                        updateStartDropdown();
+                        markers.forEach(marker => map.removeLayer(marker));
+                        markers = [];
+                        document.getElementById('successMessage').style.display = 'block';
+                    },
+                    error: (err) => alert('Lỗi khi xử lý file: ' + err.message)
+                });
+            };
+            reader.readAsBinaryString(file);
+        });
+
+        // Update start location dropdown and add default marker
+        function updateStartDropdown() {
+            const startDropdown = document.getElementById('startLocation');
+            startDropdown.innerHTML = '<option value="">Chọn điểm bắt đầu</option>';
+            stores.forEach((store, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = store.name;
+                startDropdown.appendChild(option);
+            });
+
+            startDropdown.addEventListener('change', () => {
+                const startIndex = startDropdown.value;
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+
+                if (startIndex !== '') {
+                    const startMarker = L.marker([stores[startIndex].lat, stores[startIndex].lng]).addTo(map).bindPopup(`<b>${stores[startIndex].name}</b>`);
+                    markers.push(startMarker);
+                    map.setView([stores[startIndex].lat, stores[startIndex].lng], 15);
+                }
+            });
+        }
+
+        // Generate destination dropdowns dynamically based on stores
+        const numDestinationsInput = document.getElementById('numDestinations');
+        const destinationsList = document.getElementById('destinationsList');
+        document.getElementById('generateDestinations').addEventListener('click', () => {
+            const num = parseInt(numDestinationsInput.value) || 0;
+            if (num < 1 || num > stores.length) {
+                alert(`Vui lòng nhập số điểm đến từ 1 đến ${stores.length}!`);
+                numDestinationsInput.value = Math.min(Math.max(num, 1), stores.length);
+                return;
+            }
+
+            destinationsList.innerHTML = '';
             for (let i = 0; i < num; i++) {
                 const label = document.createElement('label');
                 label.className = 'block text-sm font-medium text-gray-700 mt-2';
@@ -219,30 +353,98 @@
                 defaultOption.value = '';
                 defaultOption.textContent = 'Chọn điểm đến';
                 select.appendChild(defaultOption);
-                warehouses.forEach((warehouse, index) => {
+                stores.forEach((store, index) => {
                     const option = document.createElement('option');
                     option.value = index;
-                    option.textContent = warehouse.name;
+                    option.textContent = store.name;
                     select.appendChild(option);
                 });
                 destinationsList.appendChild(label);
                 destinationsList.appendChild(select);
+
+                select.addEventListener('change', () => {
+                    const startIndex = document.getElementById('startLocation').value;
+                    const selectedIndices = [startIndex, ...Array.from(document.querySelectorAll('[id^="destination-"]')).map(sel => sel.value)].filter(index => index !== '');
+                    markers.forEach(marker => map.removeLayer(marker));
+                    markers = [];
+
+                    if (startIndex !== '') {
+                        const startMarker = L.marker([stores[startIndex].lat, stores[startIndex].lng]).addTo(map).bindPopup(`<b>${stores[startIndex].name}</b>`);
+                        markers.push(startMarker);
+                    }
+
+                    document.querySelectorAll('[id^="destination-"]').forEach((sel, idx) => {
+                        const index = sel.value;
+                        if (index !== '' && !selectedIndices.slice(1).includes(index)) {
+                            const destMarker = L.marker([stores[index].lat, stores[index].lng]).addTo(map).bindPopup(`<b>${stores[index].name}</b>`);
+                            markers.push(destMarker);
+                        }
+                    });
+
+                    if (markers.length > 0) {
+                        const group = new L.featureGroup(markers);
+                        map.fitBounds(group.getBounds());
+                    }
+                });
             }
+        });
+
+        // Store search with autocomplete
+        const storeSearch = document.getElementById('storeSearch');
+        const searchSuggestions = document.getElementById('searchSuggestions');
+
+        storeSearch.addEventListener('input', () => {
+            const query = storeSearch.value.toLowerCase();
+            searchSuggestions.innerHTML = '';
+            if (query.length < 1) {
+                searchSuggestions.classList.remove('active');
+                return;
+            }
+
+            const suggestions = stores.filter((store, idx) => store.name.toLowerCase().includes(query));
+            suggestions.forEach((store, idx) => {
+                const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
+                const div = document.createElement('div');
+                div.className = 'search-suggestion';
+                div.textContent = store.name;
+                div.dataset.index = storeIdx;
+                div.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    storeSearch.value = store.name;
+                    searchSuggestions.classList.remove('active');
+                    map.setView([store.lat, store.lng], 15);
+                });
+                searchSuggestions.appendChild(div);
+            });
+            searchSuggestions.classList.add('active');
+        });
+
+        storeSearch.addEventListener('focus', () => {
+            if (storeSearch.value && searchSuggestions.children.length > 0) {
+                searchSuggestions.classList.add('active');
+            }
+        });
+
+        storeSearch.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (!searchSuggestions.contains(document.activeElement)) {
+                    searchSuggestions.classList.remove('active');
+                }
+            }, 200);
         });
 
         // Route calculation
         let routeLayers = [];
         document.getElementById('calculateRoute').addEventListener('click', async () => {
-            const startIndex = startDropdown.value;
+            const startIndex = document.getElementById('startLocation').value;
             if (startIndex === '') {
                 alert('Vui lòng chọn điểm bắt đầu!');
                 return;
             }
 
-            // Collect destinations
             const destinationIndices = [];
-            const numDestinations = parseInt(numDestinationsInput.value);
-            if (isNaN(numDestinations) || numDestinations < 1) {
+            const numDestinations = parseInt(numDestinationsInput.value) || 0;
+            if (numDestinations < 1) {
                 alert('Vui lòng tạo danh sách điểm đến trước!');
                 return;
             }
@@ -274,27 +476,24 @@
                 return;
             }
 
-            // Clear previous routes
             routeLayers.forEach(layer => map.removeLayer(layer));
             routeLayers = [];
 
-            // API key and setup
             const apiKey = '5b3ce3597851110001cf6248b00ac6acf0fc43ec93ea37239079ce59';
             const url = 'https://api.openrouteservice.org/v2/directions/driving-car/geojson';
             const routeInfo = document.getElementById('routeInfo');
             routeInfo.innerHTML = '';
             routeInfo.style.display = 'block';
 
-            // Colors for different route legs
             const colors = ['#ff0000', '#00ff00', '#0000ff', '#ff00ff', '#00ffff'];
             let bounds = L.latLngBounds();
 
             try {
-                let currentLocation = warehouses[startIndex];
+                let currentLocation = stores[startIndex];
                 bounds.extend([currentLocation.lat, currentLocation.lng]);
 
                 for (let i = 0; i < destinationIndices.length; i++) {
-                    const destination = warehouses[destinationIndices[i]];
+                    const destination = stores[destinationIndices[i]];
                     const body = {
                         coordinates: [
                             [currentLocation.lng, currentLocation.lat],
@@ -316,24 +515,16 @@
                     }
 
                     const data = await response.json();
-
-                    // Add route to map
                     const color = colors[i % colors.length];
                     const routeLayer = L.geoJSON(data, {
                         style: { color: color, weight: 5 }
                     }).addTo(map);
                     routeLayers.push(routeLayer);
+                    routeLayer.eachLayer(layer => bounds.extend(layer.getBounds()));
 
-                    // Extend bounds
-                    routeLayer.eachLayer(layer => {
-                        bounds.extend(layer.getBounds());
-                    });
+                    const distance = data.features[0].properties.segments[0].distance / 1000;
+                    const duration = data.features[0].properties.segments[0].duration / 60;
 
-                    // Calculate distance and duration
-                    const distance = data.features[0].properties.segments[0].distance / 1000; // km
-                    const duration = data.features[0].properties.segments[0].duration / 60; // minutes
-
-                    // Add to info box
                     const legInfo = document.createElement('div');
                     legInfo.innerHTML = `
                         <p><b>${currentLocation.name} → ${destination.name}</b></p>
@@ -343,11 +534,9 @@
                     `;
                     routeInfo.appendChild(legInfo);
 
-                    // Update current location for the next leg
                     currentLocation = destination;
                 }
 
-                // Zoom to fit all routes
                 map.fitBounds(bounds);
             } catch (error) {
                 alert('Có lỗi xảy ra khi tính đường đi: ' + error.message);
