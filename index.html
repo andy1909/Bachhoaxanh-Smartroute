@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bách Hóa Xanh - Tối Ưu Hóa Giao Hàng</title>
+    <!-- Favicon (Bách Hóa Xanh Icon) -->
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAABeSURBVFhH7dNBDQAgDAPB+5/0sYMtWgiM1t3r0M7M7gA2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDsA2AF2gJ2Z3QFsgDuAy2bNAKxYvYkWAAAAAElFTkSuQmCC">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Tailwind CSS CDN -->
@@ -499,7 +501,7 @@
 
             function updateSuggestions(query = '') {
                 startSuggestions.innerHTML = '';
-                if (query.length < 1 || stores.length === 0) {
+                if (stores.length === 0) {
                     const noData = document.createElement('div');
                     noData.className = 'location-suggestion';
                     noData.textContent = 'Không tìm thấy dữ liệu';
@@ -507,7 +509,9 @@
                     startSuggestions.appendChild(noData);
                     startSuggestions.classList.add('active');
                 } else {
-                    const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                    const suggestions = query.length > 0
+                        ? stores.filter(store => normalizeVietnameseText(store.name).includes(query))
+                        : stores;
                     if (suggestions.length > 0) {
                         suggestions.forEach((store, idx) => {
                             const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
@@ -559,7 +563,7 @@
             });
 
             startArrow.addEventListener('click', () => {
-                updateSuggestions();
+                updateSuggestions(normalizeVietnameseText(startInput.value));
                 if (startSuggestions.classList.contains('active')) {
                     startSuggestions.classList.remove('active');
                     startArrow.classList.remove('fa-chevron-up');
@@ -621,7 +625,7 @@
 
                     function updateSuggestions(query = '') {
                         suggestions.innerHTML = '';
-                        if (query.length < 1 || stores.length === 0) {
+                        if (stores.length === 0) {
                             const noData = document.createElement('div');
                             noData.className = 'location-suggestion';
                             noData.textContent = 'Không tìm thấy dữ liệu';
@@ -629,7 +633,9 @@
                             suggestions.appendChild(noData);
                             suggestions.classList.add('active');
                         } else {
-                            const suggestionsList = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                            const suggestionsList = query.length > 0
+                                ? stores.filter(store => normalizeVietnameseText(store.name).includes(query))
+                                : stores;
                             if (suggestionsList.length > 0) {
                                 suggestionsList.forEach((store, idx) => {
                                     const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
@@ -681,7 +687,7 @@
                     });
 
                     arrow.addEventListener('click', () => {
-                        updateSuggestions();
+                        updateSuggestions(normalizeVietnameseText(input.value));
                         if (suggestions.classList.contains('active')) {
                             suggestions.classList.remove('active');
                             arrow.classList.remove('fa-chevron-up');
@@ -715,7 +721,7 @@
 
             function updateSuggestions(query = '') {
                 searchSuggestions.innerHTML = '';
-                if (query.length < 1 || stores.length === 0) {
+                if (stores.length === 0) {
                     const noData = document.createElement('div');
                     noData.className = 'search-suggestion';
                     noData.textContent = 'Không tìm thấy dữ liệu';
@@ -723,7 +729,9 @@
                     searchSuggestions.appendChild(noData);
                     searchSuggestions.classList.add('active');
                 } else {
-                    const suggestions = stores.filter(store => normalizeVietnameseText(store.name).includes(query));
+                    const suggestions = query.length > 0
+                        ? stores.filter(store => normalizeVietnameseText(store.name).includes(query))
+                        : stores;
                     if (suggestions.length > 0) {
                         suggestions.forEach((store, idx) => {
                             const storeIdx = stores.findIndex(s => s.name === store.name && s.lat === store.lat && s.lng === store.lng);
@@ -778,7 +786,7 @@
             });
 
             searchArrow.addEventListener('click', () => {
-                updateSuggestions();
+                updateSuggestions(normalizeVietnameseText(storeSearch.value));
                 if (searchSuggestions.classList.contains('active')) {
                     searchSuggestions.classList.remove('active');
                     searchArrow.classList.remove('fa-chevron-up');
